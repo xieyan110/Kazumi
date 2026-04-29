@@ -44,6 +44,15 @@ class AnimeSeason {
     return [start.toString(), end.toString()];
   }
 
+  // Get date range for a full year (all four seasons)
+  // e.g. 2025 → ['2024-12-01', '2025-12-01']
+  static List<String> toFullYearStartAndEnd(int year) {
+    return [
+      DateTime(year - 1, 12, 1).toString(),
+      DateTime(year, 12, 1).toString(),
+    ];
+  }
+
   @override
   String toString() {
     var yas = _getYearAndSeason(_date);

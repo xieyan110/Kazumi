@@ -85,11 +85,7 @@ class _TimelinePageState extends State<TimelinePage>
     Tab(text: '日'),
   ];
 
-  final seasons = ['秋', '夏', '春', '冬'];
-
-  String getStringByDateTime(DateTime d) {
-    return d.year.toString() + Utils.getSeasonStringByMonth(d.month);
-  }
+  final seasons = ['春', '夏', '秋', '冬'];
 
   Future<void> scrollToFilterSection() async {
     final filterContext = filterSectionKey.currentContext;
@@ -257,27 +253,21 @@ class _TimelinePageState extends State<TimelinePage>
       builder: (BuildContext sheetContext) {
         return DraggableScrollableSheet(
           initialChildSize: 0.72,
-          minChildSize: 0.4,
+          minChildSize: 0.32,
           maxChildSize: 0.92,
           expand: false,
           builder: (context, scrollController) {
             return buildTimelineBottomSheetShell(
               sheetContext,
               header: buildSeasonSheetHeader(sheetContext),
-              body: ListView.separated(
+              body: ListView.builder(
                 controller: scrollController,
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                 itemCount: yearSeasons.keys.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final year = yearSeasons.keys.elementAt(index);
                   final availableSeasons = yearSeasons[year]!;
-
-                  return buildSeasonYearSection(
-                    context,
-                    year,
-                    availableSeasons,
-                  );
+                  return buildYearRow(context, year, availableSeasons);
                 },
               ),
             );
@@ -287,133 +277,209 @@ class _TimelinePageState extends State<TimelinePage>
     );
   }
 
-  Widget buildSeasonSheetHeader(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return buildTimelineBottomSheetHeaderCard(
-      context,
-      title: '时间机器',
-      description: '按季度回到任意放送季，时间线会立即切换。',
-      footer: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          '当前查看 ${getStringByDateTime(timelineController.selectedDate)}',
-          style: textTheme.labelLarge?.copyWith(
-            color: colorScheme.onSecondaryContainer,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-
-  DateTime? getSelectedSeason(List<DateTime> availableSeasons) {
-    for (final season in availableSeasons) {
-      if (Utils.isSameSeason(timelineController.selectedDate, season)) {
-        return season;
-      }
-    }
-
-    return null;
-  }
-
-  Widget buildSeasonYearSection(
+  Widget buildYearRow(
       BuildContext context, int year, List<DateTime> availableSeasons) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final hasSelectedSeason = getSelectedSeason(availableSeasons) != null;
+    final isCurrentYear = timelineController.selectedDate.year == year;
+    final isFullYearSelected =
+        isCurrentYear && timelineController.isFullYear;
+    final hasSelectedSeason = !timelineController.isFullYear &&
+        isCurrentYear &&
+        availableSeasons.any(
+          (d) => Utils.isSameSeason(timelineController.selectedDate, d),
+        );
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-      decoration: BoxDecoration(
-        color: hasSelectedSeason
-            ? colorScheme.secondaryContainer.withValues(alpha: 0.5)
-            : colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: hasSelectedSeason
-              ? colorScheme.secondary.withValues(alpha: 0.24)
-              : colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            '$year年',
-            style: textTheme.titleMedium?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (!hasSelectedSeason) ...[
-            const SizedBox(height: 4),
-            Text(
-              '共 ${availableSeasons.length} 个季度可选',
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+          SizedBox(
+            width: 48,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () {
+                KazumiDialog.dismiss();
+                onFullYearSelected(year);
+              },
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                child: Text(
+                  '$year',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: isCurrentYear
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                    fontWeight:
+                        isCurrentYear ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                ),
               ),
             ),
-          ],
-          const SizedBox(height: 16),
-          buildSeasonChoiceChips(context, availableSeasons),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildCompactChip(
+                    context: context,
+                    label: '全年',
+                    selected: isFullYearSelected,
+                    onTap: () {
+                      KazumiDialog.dismiss();
+                      onFullYearSelected(year);
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  ...availableSeasons.map((date) {
+                    final isSeasonSelected = hasSelectedSeason &&
+                        Utils.isSameSeason(
+                            timelineController.selectedDate, date);
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: _buildCompactChip(
+                        context: context,
+                        label: Utils.getSeasonStringByMonth(date.month),
+                        selected: isSeasonSelected,
+                        onTap: () {
+                          KazumiDialog.dismiss();
+                          onSeasonSelected(date);
+                        },
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget buildSeasonChoiceChips(
-      BuildContext context, List<DateTime> availableSeasons) {
+  Widget _buildCompactChip({
+    required BuildContext context,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final selectedSeason = getSelectedSeason(availableSeasons);
 
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: availableSeasons.map((date) {
-        final seasonName = Utils.getSeasonStringByMonth(date.month);
-        final isSelected =
-            selectedSeason != null && Utils.isSameSeason(selectedSeason, date);
-
-        return ChoiceChip(
-          label: Text(seasonName),
-          selected: isSelected,
-          onSelected: (selected) {
-            if (!selected) {
-              return;
-            }
-            KazumiDialog.dismiss();
-            onSeasonSelected(date);
-          },
-          showCheckmark: false,
-          labelStyle: textTheme.labelLarge?.copyWith(
-            color: isSelected
-                ? colorScheme.onSecondaryContainer
-                : colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
+    return Material(
+      color: selected
+          ? colorScheme.secondaryContainer
+          : colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected
+                  ? colorScheme.secondary.withValues(alpha: 0.3)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.15),
+            ),
           ),
-          backgroundColor: colorScheme.surfaceContainerHigh,
-          selectedColor: colorScheme.secondaryContainer,
-          side: BorderSide(
-            color: isSelected
-                ? Colors.transparent
-                : colorScheme.outlineVariant.withValues(alpha: 0.4),
-            width: 1,
+          child: Text(
+            label,
+            style: textTheme.labelSmall?.copyWith(
+              color: selected
+                  ? colorScheme.onSecondaryContainer
+                  : colorScheme.onSurfaceVariant,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            ),
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        );
-      }).toList(),
+        ),
+      ),
     );
+  }
+
+  Widget buildSeasonSheetHeader(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '时间机器',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '点击年份看全年，也可选季度',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '当前查看 ${timelineController.seasonString}',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSecondaryContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: KazumiDialog.dismiss,
+            icon: const Icon(Icons.close, size: 20),
+            visualDensity: VisualDensity.compact,
+            style: IconButton.styleFrom(
+              backgroundColor: colorScheme.surfaceContainerHigh,
+              minimumSize: const Size(36, 36),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void onFullYearSelected(int year) async {
+    final currDate = DateTime.now();
+    timelineController.tryEnterSeason(DateTime(year, 1, 1));
+
+    if (year == currDate.year) {
+      await timelineController.getSchedules();
+    } else {
+      await timelineController.getSchedulesBySeason(fullYear: true);
+    }
+
+    timelineController.seasonString = '$year年新番';
   }
 
   void onSeasonSelected(DateTime date) async {

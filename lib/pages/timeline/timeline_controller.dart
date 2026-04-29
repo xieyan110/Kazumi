@@ -37,6 +37,8 @@ abstract class _TimelineController with Store {
 
   int sortType = 3;
 
+  bool isFullYear = false;
+
   late DateTime selectedDate;
 
   void init() {
@@ -48,6 +50,7 @@ abstract class _TimelineController with Store {
   Future<void> getSchedules() async {
     isLoading = true;
     isTimeOut = false;
+    isFullYear = false;
     bangumiCalendar.clear();
     final resBangumiCalendar = await BangumiHTTP.getCalendar();
     bangumiCalendar.clear();
@@ -57,19 +60,21 @@ abstract class _TimelineController with Store {
     isTimeOut = bangumiCalendar.isEmpty;
   }
 
-  Future<void> getSchedulesBySeason() async {
-    // 4次获取，每次最多20部
+  Future<void> getSchedulesBySeason({bool fullYear = false}) async {
     isLoading = true;
     isTimeOut = false;
+    isFullYear = fullYear;
     bangumiCalendar.clear();
-    var time = 0;
-    const maxTime = 4;
+    final dateRange = fullYear
+        ? AnimeSeason.toFullYearStartAndEnd(selectedDate.year)
+        : AnimeSeason(selectedDate).toSeasonStartAndEnd();
+    final maxTime = fullYear ? 16 : 4;
     const limit = 20;
     var resBangumiCalendar = List.generate(7, (_) => <BangumiItem>[]);
-    for (time = 0; time < maxTime; time++) {
+    for (var time = 0; time < maxTime; time++) {
       final offset = time * limit;
       var newList = await BangumiHTTP.getCalendarBySearch(
-          AnimeSeason(selectedDate).toSeasonStartAndEnd(), limit, offset);
+          dateRange, limit, offset);
       for (int i = 0; i < resBangumiCalendar.length; ++i) {
         resBangumiCalendar[i].addAll(newList[i]);
       }
