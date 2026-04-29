@@ -223,7 +223,8 @@ class _TimelinePageState extends State<TimelinePage>
 
   void showSeasonBottomSheet(BuildContext context) {
     final currDate = DateTime.now();
-    final years = List.generate(20, (index) => currDate.year - index);
+    final years = List.generate(
+        currDate.year - 1990 + 1, (index) => currDate.year - index);
 
     // 按年份分组生成可用季节
     final yearSeasons = <int, List<DateTime>>{};
@@ -267,7 +268,7 @@ class _TimelinePageState extends State<TimelinePage>
                 itemBuilder: (context, index) {
                   final year = yearSeasons.keys.elementAt(index);
                   final availableSeasons = yearSeasons[year]!;
-                  return buildYearRow(context, year, availableSeasons);
+                  return buildYearCard(context, year, availableSeasons);
                 },
               ),
             );
@@ -277,7 +278,7 @@ class _TimelinePageState extends State<TimelinePage>
     );
   }
 
-  Widget buildYearRow(
+  Widget buildYearCard(
       BuildContext context, int year, List<DateTime> availableSeasons) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -289,112 +290,148 @@ class _TimelinePageState extends State<TimelinePage>
         availableSeasons.any(
           (d) => Utils.isSameSeason(timelineController.selectedDate, d),
         );
+    final isThisYearSelected = isFullYearSelected || hasSelectedSeason;
+
+    final seasonNames = ['春', '夏', '秋', '冬'];
+    final seasonMonths = [4, 7, 10, 1];
+
+    final availableSet = availableSeasons.map((d) => d.month).toSet();
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 48,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(6),
-              onTap: () {
-                KazumiDialog.dismiss();
-                onFullYearSelected(year);
-              },
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-                child: Text(
-                  '$year',
-                  style: textTheme.labelLarge?.copyWith(
-                    color: isCurrentYear
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-                    fontWeight:
-                        isCurrentYear ? FontWeight.w700 : FontWeight.w400,
-                  ),
-                ),
-              ),
-            ),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isThisYearSelected
+                ? colorScheme.primary.withValues(alpha: 0.5)
+                : colorScheme.outlineVariant.withValues(alpha: 0.3),
+            width: isThisYearSelected ? 1.5 : 0.5,
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  _buildCompactChip(
+                  Text(
+                    '$year',
+                    style: textTheme.titleLarge?.copyWith(
+                      color: isCurrentYear
+                          ? colorScheme.primary
+                          : colorScheme.onSurface,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  if (isThisYearSelected)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '当前',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  _buildSeasonButton(
                     context: context,
                     label: '全年',
                     selected: isFullYearSelected,
+                    enabled: true,
                     onTap: () {
                       KazumiDialog.dismiss();
                       onFullYearSelected(year);
                     },
                   ),
-                  const SizedBox(width: 6),
-                  ...availableSeasons.map((date) {
-                    final isSeasonSelected = hasSelectedSeason &&
+                  ...seasonNames.map((name) {
+                    final seasonIdx = seasonNames.indexOf(name);
+                    final month = seasonMonths[seasonIdx];
+                    final isEnabled = availableSet.contains(month);
+                    final date = isEnabled
+                        ? availableSeasons.firstWhere(
+                            (d) => d.month == month,
+                          )
+                        : null;
+                    final isSelected = hasSelectedSeason &&
+                        date != null &&
                         Utils.isSameSeason(
                             timelineController.selectedDate, date);
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: _buildCompactChip(
-                        context: context,
-                        label: Utils.getSeasonStringByMonth(date.month),
-                        selected: isSeasonSelected,
-                        onTap: () {
-                          KazumiDialog.dismiss();
-                          onSeasonSelected(date);
-                        },
-                      ),
+                    return _buildSeasonButton(
+                      context: context,
+                      label: name,
+                      selected: isSelected,
+                      enabled: isEnabled,
+                      onTap: () {
+                        KazumiDialog.dismiss();
+                        onSeasonSelected(date!);
+                      },
                     );
                   }),
                 ],
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildCompactChip({
+  Widget _buildSeasonButton({
     required BuildContext context,
     required String label,
     required bool selected,
+    required bool enabled,
     required VoidCallback onTap,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final labelStyle = textTheme.labelLarge?.copyWith(
+      color: enabled
+          ? (selected ? colorScheme.onPrimaryContainer : colorScheme.onSurface)
+          : colorScheme.onSurface.withValues(alpha: 0.3),
+      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+    );
 
-    return Material(
-      color: selected
-          ? colorScheme.secondaryContainer
-          : colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: selected
-                  ? colorScheme.secondary.withValues(alpha: 0.3)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.15),
-            ),
-          ),
-          child: Text(
-            label,
-            style: textTheme.labelSmall?.copyWith(
-              color: selected
-                  ? colorScheme.onSecondaryContainer
-                  : colorScheme.onSurfaceVariant,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: Material(
+          color: selected
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: enabled ? onTap : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: selected
+                      ? colorScheme.primary.withValues(alpha: 0.4)
+                      : colorScheme.outlineVariant.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Text(label, style: labelStyle),
             ),
           ),
         ),
@@ -408,60 +445,50 @@ class _TimelinePageState extends State<TimelinePage>
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '时间机器',
-                  style: textTheme.titleMedium?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '点击年份看全年，也可选季度',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: colorScheme.secondaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '当前查看 ${timelineController.seasonString}',
-                    style: textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSecondaryContainer,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primaryContainer,
+                  colorScheme.secondaryContainer,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.history_rounded,
+              color: colorScheme.onPrimaryContainer,
+              size: 18,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '时间机器 · ${timelineController.seasonString}',
+              style: textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
           IconButton(
             onPressed: KazumiDialog.dismiss,
-            icon: const Icon(Icons.close, size: 20),
+            icon: const Icon(Icons.close, size: 18),
             visualDensity: VisualDensity.compact,
             style: IconButton.styleFrom(
               backgroundColor: colorScheme.surfaceContainerHigh,
-              minimumSize: const Size(36, 36),
+              minimumSize: const Size(30, 30),
             ),
           ),
         ],
