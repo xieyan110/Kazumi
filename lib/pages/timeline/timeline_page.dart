@@ -258,23 +258,20 @@ class _TimelinePageState extends State<TimelinePage>
           maxChildSize: 0.92,
           expand: false,
           builder: (context, scrollController) {
+            final yearKeys = yearSeasons.keys.toList();
             // Auto-scroll to the currently selected year
             final selectedYear = timelineController.selectedDate.year;
-            final yearKeys = yearSeasons.keys.toList();
             final selectedIndex = yearKeys.indexOf(selectedYear);
             if (selectedIndex > 0) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (scrollController.hasClients) {
-                  const estimatedItemHeight = 130.0;
-                  final maxOffset = scrollController.position.maxScrollExtent;
-                  final targetOffset =
-                      (selectedIndex * estimatedItemHeight).clamp(0.0, maxOffset);
-                  scrollController.animateTo(
-                    targetOffset,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOutCubic,
-                  );
-                }
+                Future.delayed(const Duration(milliseconds: 350), () {
+                  if (scrollController.hasClients) {
+                    final targetOffset =
+                        (selectedIndex * 118.0).clamp(
+                            0.0, scrollController.position.maxScrollExtent);
+                    scrollController.jumpTo(targetOffset);
+                  }
+                });
               });
             }
             return buildTimelineBottomSheetShell(
@@ -283,9 +280,9 @@ class _TimelinePageState extends State<TimelinePage>
               body: ListView.builder(
                 controller: scrollController,
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                itemCount: yearSeasons.keys.length,
+                itemCount: yearKeys.length,
                 itemBuilder: (context, index) {
-                  final year = yearSeasons.keys.elementAt(index);
+                  final year = yearKeys[index];
                   final availableSeasons = yearSeasons[year]!;
                   return buildYearCard(context, year, availableSeasons);
                 },
