@@ -53,6 +53,8 @@ class _SourceSheetState extends State<SourceSheet>
     keyword = widget.infoController.bangumiItem.nameCn == ''
         ? widget.infoController.bangumiItem.name
         : widget.infoController.bangumiItem.nameCn;
+    // Take only the text before the first space (e.g. "xx yy" → "xx")
+    keyword = keyword.split(' ').first;
     // Strip trailing punctuation (e.g. "xxx!", "xxx。", "xxx?!") to improve search results
     keyword = keyword.replaceAll(RegExp(r'[\s!?！？。，,\.〜。、；;：:‼⁇⁈⁉～〜〜]+$'), '');
     queryManager = QueryManager(infoController: widget.infoController);

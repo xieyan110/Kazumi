@@ -258,6 +258,25 @@ class _TimelinePageState extends State<TimelinePage>
           maxChildSize: 0.92,
           expand: false,
           builder: (context, scrollController) {
+            // Auto-scroll to the currently selected year
+            final selectedYear = timelineController.selectedDate.year;
+            final yearKeys = yearSeasons.keys.toList();
+            final selectedIndex = yearKeys.indexOf(selectedYear);
+            if (selectedIndex > 0) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (scrollController.hasClients) {
+                  const estimatedItemHeight = 130.0;
+                  final maxOffset = scrollController.position.maxScrollExtent;
+                  final targetOffset =
+                      (selectedIndex * estimatedItemHeight).clamp(0.0, maxOffset);
+                  scrollController.animateTo(
+                    targetOffset,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                  );
+                }
+              });
+            }
             return buildTimelineBottomSheetShell(
               sheetContext,
               header: buildSeasonSheetHeader(sheetContext),
@@ -502,6 +521,7 @@ class _TimelinePageState extends State<TimelinePage>
 
     if (year == currDate.year) {
       await timelineController.getSchedules();
+      timelineController.isFullYear = true;
     } else {
       await timelineController.getSchedulesBySeason(fullYear: true);
     }
